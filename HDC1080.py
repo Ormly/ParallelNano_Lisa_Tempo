@@ -6,7 +6,7 @@ import time
 import pickle
 import json
 
-import daemon          
+import daemon
 import SDL_Pi_HDC1080
 
 
@@ -37,8 +37,8 @@ class SensorInformation:
         """
         Loads the dynamic components of sensor info, has to be called before requesting updated information
         """
-        self._sensor_info['cur_temp'] = self._hdc1080.readTemperature()
-        self._sensor_info['cur_hum'] = self._hdc1080.readHumidity()
+        self._sensor_info['current_humidity'] = self._hdc1080.readHumidity()
+        self._sensor_info['current_temperature'] = self._hdc1080.readTemperature()
 
     def _serialize(self) -> bytes:
         """
