@@ -20,9 +20,9 @@ class SensorInformation:
     """
     def __init__(self):
         self._sensor_info: Dict[str, str] = {}
-        hdc1080 = SDL_Pi_HDC1080.SDL_Pi_HDC1080()
-        hdc1080.setTemperatureResolution(SDL_Pi_HDC1080.HDC1080_CONFIG_TEMPERATURE_RESOLUTION_14BIT)
-        hdc1080.setHumidityResolution(SDL_Pi_HDC1080.HDC1080_CONFIG_HUMIDITY_RESOLUTION_14BIT)
+        self._hdc1080 = SDL_Pi_HDC1080.SDL_Pi_HDC1080()
+        self._hdc1080.setTemperatureResolution(SDL_Pi_HDC1080.HDC1080_CONFIG_TEMPERATURE_RESOLUTION_14BIT)
+        self._hdc1080.setHumidityResolution(SDL_Pi_HDC1080.HDC1080_CONFIG_HUMIDITY_RESOLUTION_14BIT)
 
     def update_and_serialize(self) -> bytes:
         """
@@ -37,8 +37,8 @@ class SensorInformation:
         """
         Loads the dynamic components of sensor info, has to be called before requesting updated information
         """
-        self._sensor_info['cur_temp'] = hdc1080.readTemperature()
-		self._sensor_info['cur_hum'] = hdc1080.readHumidity()
+        self._sensor_info['cur_temp'] = self._hdc1080.readTemperature()
+        self._sensor_info['cur_hum'] = self._hdc1080.readHumidity()
 
     def _serialize(self) -> bytes:
         """
