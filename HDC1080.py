@@ -1,90 +1,84 @@
-from typing import Dict, Tuple
-import os
-import sys
-import socket
-import time
-import pickle
+"""
+The sensor component of the monitoring system
+"""
+from typing import Dict
 import json
+import sys
+import os
+import signal
+import time
 
+from ipcqueue import posixmq
 import daemon
-import SDL_Pi_HDC1080
+import sdl_pi_hdc1080
 
 
 class ConfigFileInvalidError(Exception):
+    """
+    Should be raised to indicate an invalid config file structure
+    """
     pass
 
 
-class SensorInformation:
+class SensorData:
     """
-    Represents a collection of sensor information that can be updated and serialized
+    puts the sensor info onto the IPC queue
     """
-    def __init__(self):
-        self._sensor_info: Dict[str, str] = {}
-        self._hdc1080 = SDL_Pi_HDC1080.SDL_Pi_HDC1080()
-        self._hdc1080.setTemperatureResolution(SDL_Pi_HDC1080.HDC1080_CONFIG_TEMPERATURE_RESOLUTION_14BIT)
-        self._hdc1080.setHumidityResolution(SDL_Pi_HDC1080.HDC1080_CONFIG_HUMIDITY_RESOLUTION_14BIT)
-
-    def update_and_serialize(self) -> bytes:
-        """
-        Load updated sensor information and return it in serialized form
-        :return:
-        """
-        self._update()
-        return self._serialize()
-
-
-    def _update(self):
-        """
-        Loads the dynamic components of sensor info, has to be called before requesting updated information
-        """
-        self._sensor_info['current_humidity'] = self._hdc1080.readHumidity()
-        self._sensor_info['current_temperature'] = self._hdc1080.readTemperature()
-
-    def _serialize(self) -> bytes:
-        """
-        Returns a bytes representation of the sensor information
-        :return:
-        """
-        return pickle.dumps(self._sensor_info)
-
-
-class Beacon:
-    """
-    Cyclically sends updated sensor information over the given socket
-    """
-    def __init__(self, ip_port: Tuple[str, int], interval: float):
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.ip_port = ip_port
+    def __init__(self, queue_id: str, queue_size: int, interval: float):
+        self.queue_id = queue_id
+        self.queue_size = queue_size
         self.interval = interval
-        self._sensor_info = SensorInformation()
+
+        self.ipc_queue: posixmq.Queue
+
+        self._init_queue()
+        self._sensor_info: Dict[str, str] = {}
+        self._hdc1080 = sdl_pi_hdc1080.SDL_Pi_HDC1080()
+        self._hdc1080.setTemperatureResolution(sdl_pi_hdc1080.HDC1080_CONFIG_TEMPERATURE_RESOLUTION_14BIT)
+        self._hdc1080.setHumidityResolution(sdl_pi_hdc1080.HDC1080_CONFIG_HUMIDITY_RESOLUTION_14BIT)
+
+    def _init_queue(self):
+        if not (isinstance(self.queue_id, str) and self.queue_id.startswith("/") and len(self.queue_id) < 255):
+            raise ValueError("Invalid queue id")
+        self.ipc_queue = posixmq.Queue(name=self.queue_id)
 
     def start(self):
+        """
+        post sensor data on the IPC queue
+        If full, do nothing else
+        :return:
+        """
         while True:
-            payload = self._sensor_info.update_and_serialize()
-            self._send_sensor_info(payload)
+            self._sensor_info['current_humidity'] = self._hdc1080.readHumidity()
+            self._sensor_info['current_temperature'] = self._hdc1080.readTemperature()
+            try:
+                self.ipc_queue.put_nowait(self._sensor_info)
+            except posixmq.queue.Full:
+                # queue is full -> nobody's listening on the other side. nothing to do.
+                pass
             time.sleep(self.interval)
 
-    def _send_sensor_info(self, payload: bytes):
-        sent_bytes = 0
+    def cleanup(self):
+        """
+        clean up the queue
+        :return:
+        """
+        if self.ipc_queue:
+            self.ipc_queue.close()
 
-        # not all bytes might get sent after first call
-        while sent_bytes < len(payload):
-            sent_bytes += self.sock.sendto(payload, self.ip_port)
-
-
-class BeaconFactory:
+class ConfigFactory:
     """
-    Creates a beacon object from a config file
+    Reads the config from a validated config file
     """
-    def from_config_file(self, filepath: str) -> Beacon:
+    def from_config_file(self, filepath: str) -> SensorData:
         with open(filepath, 'r') as f:
             config = json.load(f)
             self._validate_config_file(config)
-            ip = config['server_ip']
-            port = config['server_port']
+            queue_id = config['queue_id']
+            queue_size = config['queue_size']
             interval = config['interval']
 
-            return Beacon(ip_port=(ip, port), interval=interval)
+            return SensorData(queue_id=queue_id, queue_size=queue_size, interval=interval)
 
     @staticmethod
     def _validate_config_file(config: Dict):
@@ -94,29 +88,33 @@ class BeaconFactory:
         :return:
         """
         if not isinstance(config, dict):
-            raise ConfigFileInvalidError("Config file is not a vaild dictionary")
-        if "server_ip" not in config.keys():
-            raise ConfigFileInvalidError("server_ip missing in config file")
-        if "server_port" not in config.keys():
-            raise ConfigFileInvalidError("server_port missing in config file")
+            raise ConfigFileInvalidError("Config file is not a valid dictionary")
+        if "queue_id" not in config.keys():
+            raise ConfigFileInvalidError("queue_id missing in config file")
+        if "queue_size" not in config.keys():
+            raise ConfigFileInvalidError("queue_size missing in config file")
         if "interval" not in config.keys():
             raise ConfigFileInvalidError("interval missing in config file")
 
 
-def main():
-    factory = BeaconFactory()
-    beacon = factory.from_config_file("config.json")
-    beacon.start()
+def main(daemon_context: daemon.DaemonContext):
+    factory = ConfigFactory()
+    sensor_data = factory.from_config_file("config.json")
+
+    # set termination callback
+    daemon_context.signal_map[signal.SIGTERM] = sensor_data.cleanup
+    sensor_data.start()
 
 
 if __name__ == '__main__':
-    # start beacon as daemon
     # TODO: optionally get config file path from stdin
     config_file = open("config.json", 'r')
+
     with daemon.DaemonContext(
-            files_preserve=[config_file],
-            chroot_directory=None,
-            stderr=sys.stderr,  # if any, errors shall be printed to stderr
-            working_directory=os.getcwd()
-    ):
-        main()
+        files_preserve=[config_file],
+        chroot_directory=None,
+        stderr=sys.stderr,  # if any, errors shall be printed to stderr
+        working_directory=os.getcwd()
+    ) as context:
+        # start beacon_server as daemon
+        main(context)

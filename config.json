@@ -1,5 +1,5 @@
 {
-  "server_ip": "127.0.0.1",
-  "server_port": 4444,
-  "interval": 1.0
+  "queue_id": "/sensor_status",
+  "queue_size": 20,
+  "interval": 5.0
 }
