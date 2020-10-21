@@ -63,12 +63,7 @@ print ("change humidity resolution")
 hdc1080.setHumidityResolution(sdl_pi_hdc1080.HDC1080_CONFIG_HUMIDITY_RESOLUTION_14BIT)
 # read configuration register
 print ("configure register = 0x%X" % hdc1080.readConfigRegister())
-
-while True:
-        
-        print ("-----------------")
-        print ("Temperature = %3.1f C" % hdc1080.readTemperature())
-        print ("Humidity = %3.1f %%" % hdc1080.readHumidity())
-        print ("-----------------")
-
-        time.sleep(3.0)
+# read temperature
+print ("Temperature = %3.1f C" % hdc1080.readTemperature())
+# read humdity
+print ("Humidity = %3.1f %%" % hdc1080.readHumidity())
