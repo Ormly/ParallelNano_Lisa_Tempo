@@ -116,5 +116,5 @@ if __name__ == '__main__':
         stderr=sys.stderr,  # if any, errors shall be printed to stderr
         working_directory=os.getcwd()
     ) as context:
-        # start beacon_server as daemon
+        # start main as daemon
         main(context)

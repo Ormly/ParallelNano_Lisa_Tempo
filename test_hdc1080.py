@@ -26,9 +26,9 @@ print ("")
 hdc1080 = sdl_pi_hdc1080.SDL_Pi_HDC1080()
 
 print ("------------")
-print ("Manfacturer ID=0x%X"% hdc1080.readManufacturerID())  
+print ("Manfacturer ID = 0x%X"% hdc1080.readManufacturerID())  
 print ("Device ID=0x%X"% hdc1080.readDeviceID() ) 
-print ("Serial Number ID=0x%X"% hdc1080.readSerialNumber())  
+print ("Serial Number ID = 0x%X"% hdc1080.readSerialNumber())  
 # read configuration register
 print ("configure register = 0x%X" % hdc1080.readConfigRegister())
 # turn heater on
