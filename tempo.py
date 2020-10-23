@@ -22,25 +22,25 @@ class ConfigFileInvalidError(Exception):
 
 class SensorData:
     """
-    puts the sensor info onto the IPC queue
+    puts the sensor data onto the IPC queue
     """
     def __init__(self, queue_id: str, queue_size: int, interval: float):
-        self.queue_id = queue_id
-        self.queue_size = queue_size
-        self.interval = interval
+        self._queue_id = queue_id
+        self._queue_size = queue_size
+        self._interval = interval
 
-        self.ipc_queue: posixmq.Queue
+        self._ipc_queue: posixmq.Queue
 
         self._init_queue()
         self._sensor_info: Dict[str, str] = {}
-        self._hdc1080 = sdl_pi_hdc1080.SDL_Pi_HDC1080()
-        self._hdc1080.setTemperatureResolution(sdl_pi_hdc1080.HDC1080_CONFIG_TEMPERATURE_RESOLUTION_14BIT)
-        self._hdc1080.setHumidityResolution(sdl_pi_hdc1080.HDC1080_CONFIG_HUMIDITY_RESOLUTION_14BIT)
+        self._tempo = sdl_pi_hdc1080.SDL_Pi_HDC1080()
+        self._tempo.setTemperatureResolution(sdl_pi_hdc1080.HDC1080_CONFIG_TEMPERATURE_RESOLUTION_14BIT)
+        self._tempo.setHumidityResolution(sdl_pi_hdc1080.HDC1080_CONFIG_HUMIDITY_RESOLUTION_14BIT)
 
     def _init_queue(self):
-        if not (isinstance(self.queue_id, str) and self.queue_id.startswith("/") and len(self.queue_id) < 255):
+        if not (isinstance(self._queue_id, str) and self._queue_id.startswith("/") and len(self._queue_id) < 255):
             raise ValueError("Invalid queue id")
-        self.ipc_queue = posixmq.Queue(name=self.queue_id)
+        self._ipc_queue = posixmq.Queue(name=self._queue_id)
 
     def start(self):
         """
@@ -49,22 +49,22 @@ class SensorData:
         :return:
         """
         while True:
-            self._sensor_info['current_humidity'] = self._hdc1080.readHumidity()
-            self._sensor_info['current_temperature'] = self._hdc1080.readTemperature()
+            self._sensor_info['current_humidity'] = self._tempo.readHumidity()
+            self._sensor_info['current_temperature'] = self._tempo.readTemperature()
             try:
-                self.ipc_queue.put_nowait(self._sensor_info)
+                self._ipc_queue.put_nowait(self._sensor_info)
             except posixmq.queue.Full:
                 # queue is full -> nobody's listening on the other side. nothing to do.
                 pass
-            time.sleep(self.interval)
+            time.sleep(self._interval)
 
     def cleanup(self):
         """
         clean up the queue
         :return:
         """
-        if self.ipc_queue:
-            self.ipc_queue.close()
+        if self._ipc_queue:
+            self._ipc_queue.close()
 
 class ConfigFactory:
     """
