@@ -7,6 +7,7 @@ import sys
 import os
 import signal
 import time
+import pathlib
 
 from ipcqueue import posixmq
 import daemon
@@ -99,7 +100,7 @@ class ConfigFactory:
 
 def main(daemon_context: daemon.DaemonContext):
     factory = ConfigFactory()
-    sensor_data = factory.from_config_file("config.json")
+    factory.from_config_file(str(pathlib.Path(__file__).parent) + "/config.json")
 
     # set termination callback
     daemon_context.signal_map[signal.SIGTERM] = sensor_data.cleanup
@@ -108,7 +109,7 @@ def main(daemon_context: daemon.DaemonContext):
 
 if __name__ == '__main__':
     # TODO: optionally get config file path from stdin
-    config_file = open("config.json", 'r')
+    config_file = open(str(pathlib.Path(__file__).parent) + "/config.json", "r")
 
     with daemon.DaemonContext(
         files_preserve=[config_file],
