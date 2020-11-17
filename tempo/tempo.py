@@ -100,7 +100,7 @@ class ConfigFactory:
 
 def main(daemon_context: daemon.DaemonContext):
     factory = ConfigFactory()
-    factory.from_config_file(str(pathlib.Path(__file__).parent) + "/config.json")
+    sensor_data = factory.from_config_file(str(pathlib.Path(__file__).parent) + "/config.json")
 
     # set termination callback
     daemon_context.signal_map[signal.SIGTERM] = sensor_data.cleanup
